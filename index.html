@@ -1,0 +1,288 @@
+<html>
+<head>
+<title>Crit & Hero Jade Skill Optimizer (for Lyrania)</title>
+<script src="https://cdn.jsdelivr.net/npm/vue"></script>
+</head>
+<body>
+<div id="app">
+  <p>
+    <label for="chc">CHC</label>
+    <input id="chc" type="number" min="0" step="0.1" v-model.number="chc">
+    <span> Cost for one upgrade: {{ next_chc_cost }} </span>
+    <span> Max CHC: {{ max_chc.toFixed(1) }}% </span>
+    <br />
+    <label for="archery">Archery Tournament</label>
+    <input id="archery" type="number" min="0" v-model.number="archery">
+    <span> Effective CHC: {{ chc_eff }}% </span>
+  </p>
+  <p>
+    <label for="chd">CHD</label>
+    <input id="chd" type="number" min="50" step="0.1" v-model.number="chd">
+    <span> Cost for one upgrade: {{ next_chd_cost }} </span>
+    <span> Max CHD: {{ max_chd.toFixed(1) }}% </span>
+    <br />
+    <label for="refinery">Weapon Refinery</label>
+    <input id="refinery" type="number" min="0" v-model.number="refinery">
+    <span> Effective CHD: {{ chd_eff }}% </span>
+  </p>
+  <p>
+    <label for="hero">Heroism</label>
+    <input id="hero" type="number" min="0" step="0.25" v-model.number="hero">
+    <span> Cost for one upgrade: {{ next_hero_cost }} </span>
+    <span> Max Heroism: {{ max_hero.toFixed(2) }}% </span>
+    <br />
+    <label for="academy">Boss Fighting Academy</label>
+    <input id="academy" type="number" min="0" v-model.number="academy">
+    <span> Effective Heroism: {{ hero_eff }}% </span>
+  </p>
+  <p>
+    <label for="joaj_token">JoaJ Token Boost</label>
+    <input id="joaj_token" type="number" min="0" max="50" step="1" v-model.number="joaj_token">
+    <br>
+    <label for="joaj_boost">JoaJ Event Bonus</label>
+    <input id="joaj_boost" type="checkbox" v-model="joaj_boost">
+    <br>
+    <label for="joaj_global">JoaJ Global Purchase Bonus</label>
+    <input id="joaj_global" type="number" min="0" max="10" step="1" v-model.number="joaj_global">
+    <br>
+    <label for="joaj_bought">JoaJ Personal Purchase Bonus</label>
+    <input id="joaj_bought" type="number" min="0" max="5" step="1" v-model.number="joaj_bought">
+    <br>
+    <span> Combined JoaJ: {{ joaj_eff }}% </span>
+  </p>
+  <p>
+    <label for="jade">Maximum Jade to Spend</label>
+    <input id="jade" type="number" min="0" step="1" v-model.number="jade">
+  </p>
+  <p>
+    <span> Current Mob Damage: {{ mob.toFixed(2) }}% Optimal Mob Damage: {{ opt_mob.out.toFixed(2) }}% </span>
+    <br />
+    <span> CHC: {{ opt_mob.chc / 10 }}% ({{ opt_mob.chc - chc_raw }} upgrades) CHD: {{ opt_mob.chd / 10 + 50 }}% ({{ opt_mob.chd - chd_raw }} upgrades) </span>
+    <br />
+    <span> Cost: {{ opt_mob.cost }} </span>
+  </p>
+  <p>
+    <span> Current Boss Bonus: {{ boss.toFixed(2) }}% Optimal Boss Damage: {{ opt_boss.out.toFixed(2) }}% </span>
+    <br />
+    <span> CHC: {{ opt_boss.chc / 10 }}% ({{ opt_boss.chc - chc_raw }} upgrades) CHD: {{ opt_boss.chd / 10 + 50 }}% ({{ opt_boss.chd - chd_raw }} upgrades) Heroism: {{ opt_boss.hero / 4 }}% ({{ opt_boss.hero - hero_raw }} upgrades) </span>
+    <br />
+    <span> Cost: {{ opt_boss.cost }} </span>
+  </p>
+  <p>
+    <button @click="save_data()">Save</button>
+    <button @click="delete_saved()">Delete</button>
+  </p>
+</div>
+<script type="text/javascript">
+  var app = new Vue({
+    el: '#app',
+    data: {
+      chc: 0,
+      archery: 0,
+      chd: 50,
+      refinery: 0,
+      hero: 0,
+      academy: 0,
+      joaj_token: 0,
+      joaj_global: 0,
+      joaj_bought: 0,
+      joaj_boost: false,
+      jade: 0,
+    },
+    mounted() {
+      if(localStorage.chc) this.chc = parseFloat(localStorage.chc);
+      if(localStorage.archery) this.archery = parseInt(localStorage.archery);
+      if(localStorage.chd) this.chd = parseFloat(localStorage.chd);
+      if(localStorage.refinery) this.refinery = parseInt(localStorage.refinery);
+      if(localStorage.hero) this.hero = parseFloat(localStorage.hero);
+      if(localStorage.academy) this.academy = parseInt(localStorage.academy);
+      if(localStorage.joaj_token) this.joaj_token = parseInt(localStorage.joaj_token);
+      if(localStorage.joaj_global) this.joaj_global = parseInt(localStorage.joaj_global);
+      if(localStorage.joaj_bought) this.joaj_bought = parseInt(localStorage.joaj_bought);
+      if(localStorage.joaj_boost) this.joaj_boost = JSON.parse(localStorage.joaj_boost);
+      if(localStorage.jade) this.jade = parseInt(localStorage.jade);
+    },
+    computed: {
+      chc_raw: function() {
+        return Math.round(this.chc * 10);
+      },
+      chd_raw: function() {
+        return Math.round(this.chd * 10 - 500);
+      },
+      hero_raw: function() {
+        return Math.round(this.hero * 4);
+      },
+      chc_eff: function() {
+        return this.chc_raw / 10 + this.archery * 5;
+      },
+      chd_eff: function () {
+        return this.chd_raw / 10 + 50 + this.refinery * 5;
+      },
+      hero_eff: function() {
+        return this.hero_raw / 4 + this.academy * 12.5;
+      },
+      mob: function() {
+        return this.mob_bonus(this.chc_eff, this.chd_eff);
+      },
+      boss: function() {
+        return this.boss_bonus(this.chc_eff, this.chd_eff, this.hero_eff);
+      },
+      joaj_eff: function() {
+        return this.joaj_token + this.joaj_global + this.joaj_bought + (this.joaj_boost ? 10 : 0);
+      },
+      next_chc_cost: function() {
+        return this.cost(this.chc_raw + 1, this.joaj_eff);
+      },
+      next_chd_cost: function() {
+        return this.cost(this.chd_raw + 1, this.joaj_eff);
+      },
+      next_hero_cost: function() {
+        return this.cost(this.hero_raw + 1, this.joaj_eff);
+      },
+      max_chc: function() {
+        return this.max_stat(this.chc_raw, this.jade) / 10;
+      },
+      max_chd: function() {
+        return 50 + this.max_stat(this.chd_raw, this.jade) / 10;
+      },
+      max_hero: function() {
+        return this.max_stat(this.hero_raw, this.jade) / 4;
+      },
+      // After two months ignoring this, I decided to get it working in a hurry. Don't judge me.
+      opt_mob: function() {
+        var cost_so_far = 0;
+        var chc_inced = this.chc_raw;
+        var next_chc_cost = this.cost(chc_inced + 1, this.joaj_eff);
+        var chd_inced = this.chd_raw;
+        var next_chd_cost = this.cost(chd_inced + 1, this.joaj_eff);
+        var bonus_so_far = this.mob_bonus_raw(chc_inced, chd_inced);
+        while(true) {
+          var bonus_chc_up = this.mob_bonus_raw(chc_inced + 1, chd_inced);
+          var bonus_chd_up = this.mob_bonus_raw(chc_inced, chd_inced + 1);
+          var chc_value = (bonus_chc_up - bonus_so_far) / next_chc_cost;
+          var chd_value = (bonus_chd_up - bonus_so_far) / next_chd_cost;
+          if(chc_value >= chd_value) {
+            if(cost_so_far + next_chc_cost > this.jade) break;
+            cost_so_far += next_chc_cost;
+            bonus_so_far = bonus_chc_up;
+            ++chc_inced;
+            next_chc_cost = this.cost(chc_inced + 1, this.joaj_eff)
+          } else {
+            if(cost_so_far + next_chd_cost > this.jade) break;
+            cost_so_far += next_chd_cost;
+            bonus_so_far = bonus_chd_up;
+            ++chd_inced;
+            next_chd_cost = this.cost(chd_inced + 1, this.joaj_eff)
+          }
+        }
+        return {
+          chc: chc_inced,
+          chd: chd_inced,
+          out: bonus_so_far,
+          cost: cost_so_far,
+        };
+      },
+      opt_boss: function() {
+        var cost_so_far = 0;
+        var chc_inced = this.chc_raw;
+        var next_chc_cost = this.cost(chc_inced + 1, this.joaj_eff);
+        var chd_inced = this.chd_raw;
+        var next_chd_cost = this.cost(chd_inced + 1, this.joaj_eff);
+        var hero_inced = this.hero_raw;
+        var next_hero_cost = this.cost(hero_inced + 1, this.joaj_eff);
+        var bonus_so_far = this.boss_bonus_raw(chc_inced, chd_inced, hero_inced);
+        while(true) {
+          var bonus_chc_up = this.boss_bonus_raw(chc_inced + 1, chd_inced, hero_inced);
+          var bonus_chd_up = this.boss_bonus_raw(chc_inced, chd_inced + 1, hero_inced);
+          var bonus_hero_up = this.boss_bonus_raw(chc_inced, chd_inced, hero_inced + 1);
+          var chc_value = (bonus_chc_up - bonus_so_far) / next_chc_cost;
+          var chd_value = (bonus_chd_up - bonus_so_far) / next_chd_cost;
+          var hero_value = (bonus_hero_up - bonus_so_far) / next_hero_cost;
+          if(chc_value >= chd_value && chc_value >= hero_value) {
+            if(cost_so_far + next_chc_cost > this.jade) break;
+            cost_so_far += next_chc_cost;
+            bonus_so_far = bonus_chc_up;
+            ++chc_inced;
+            next_chc_cost = this.cost(chc_inced + 1, this.joaj_eff)
+          } else if( chd_value >= hero_value) {
+            if(cost_so_far + next_chd_cost > this.jade) break;
+            cost_so_far += next_chd_cost;
+            bonus_so_far = bonus_chd_up;
+            ++chd_inced;
+            next_chd_cost = this.cost(chd_inced + 1, this.joaj_eff)
+          } else {
+            if(cost_so_far + next_hero_cost > this.jade) break;
+            cost_so_far += next_hero_cost;
+            bonus_so_far = bonus_hero_up;
+            ++hero_inced;
+            next_hero_cost = this.cost(hero_inced + 1, this.joaj_eff)
+          }
+        }
+        return {
+          chc: chc_inced,
+          chd: chd_inced,
+          hero: hero_inced,
+          out: bonus_so_far,
+          cost: cost_so_far,
+        };
+      },
+    },
+    methods: {
+      mob_bonus: function(chc, chd) {
+        return chc * chd / 100;
+      },
+      mob_bonus_raw: function(chc_raw, chd_raw) {
+        return this.mob_bonus(
+          chc_raw / 10 + this.archery * 5,
+          chd_raw / 10 + 50 + this.refinery * 5
+        );
+      },
+      boss_bonus: function(chc, chd, hero) {
+        return 100*(((1+hero*4/500)*(1+chc/200+(chc/100)*(chd/100)))-1);
+      },
+      boss_bonus_raw: function(chc_raw, chd_raw, hero_raw) {
+        return this.boss_bonus(
+          chc_raw / 10 + this.archery * 5,
+          chd_raw / 10 + 50 + this.refinery * 5,
+          hero_raw / 4 + this.academy * 12.5
+        );
+      },
+      // base: the level you want to buy, in terms of the number of upgrades
+      // returns the cost of one level only
+      cost: function(base, joaj) {
+        return Math.ceil(Math.max(0, Math.round(base) * 5 * (1 - Math.min(100,Math.max(0,joaj))/100)));
+      },
+      // start_val: the current level, in terms of the number of upgrades
+      // use_jade: the maximum amount of jade to spend
+      max_stat: function(start_val, use_jade) {
+        var cost_so_far = 0;
+        var increments = 0;
+        var next_cost = this.cost(start_val + increments + 1, this.joaj_eff);
+        while(use_jade - cost_so_far >= next_cost) {
+          cost_so_far += next_cost;
+          ++increments;
+          next_cost = this.cost(start_val + increments + 1, this.joaj_eff);
+        }
+        return start_val + increments;
+      },
+      save_data: function() {
+        localStorage.chc = this.chc;
+        localStorage.archery = this.archery;
+        localStorage.chd = this.chd;
+        localStorage.refinery = this.refinery;
+        localStorage.hero = this.hero;
+        localStorage.academy = this.academy;
+        localStorage.joaj_token = this.joaj_token;
+        localStorage.joaj_global = this.joaj_global;
+        localStorage.joaj_bought = this.joaj_bought;
+        localStorage.joaj_boost = this.joaj_boost;
+        localStorage.jade = this.jade;
+      },
+      delete_saved: function() {
+        localStorage.clear();
+      },
+    },
+  })
+</script>
+</body>
+</html>
