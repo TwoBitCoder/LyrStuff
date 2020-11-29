@@ -48,6 +48,9 @@
     <label for="joaj_bought">JoaJ Personal Purchase Bonus</label>
     <input id="joaj_bought" type="number" min="0" max="5" step="1" v-model.number="joaj_bought">
     <br>
+    <label for="joaj_enchants">JoaJ Enchants</label>
+    <input id="joaj_enchants" type="number" min="0" max="6" step="1" v-model.number="joaj_enchants">
+    <br>
     <span> Combined JoaJ: {{ joaj_eff }}% </span>
   </p>
   <p>
@@ -87,6 +90,7 @@
       joaj_global: 0,
       joaj_bought: 0,
       joaj_boost: false,
+      joaj_enchants: 0,
       jade: 0,
     },
     mounted() {
@@ -100,6 +104,7 @@
       if(localStorage.joaj_global) this.joaj_global = parseInt(localStorage.joaj_global);
       if(localStorage.joaj_bought) this.joaj_bought = parseInt(localStorage.joaj_bought);
       if(localStorage.joaj_boost) this.joaj_boost = JSON.parse(localStorage.joaj_boost);
+      if(localStorage.joaj_enchants) this.joaj_enchants = JSON.parse(localStorage.joaj_enchants);
       if(localStorage.jade) this.jade = parseInt(localStorage.jade);
     },
     computed: {
@@ -128,7 +133,7 @@
         return this.boss_bonus(this.chc_eff, this.chd_eff, this.hero_eff);
       },
       joaj_eff: function() {
-        return this.joaj_token + this.joaj_global + this.joaj_bought + (this.joaj_boost ? 10 : 0);
+        return this.joaj_token + this.joaj_global + this.joaj_bought + this.joaj_enchants + (this.joaj_boost ? 10 : 0);
       },
       next_chc_cost: function() {
         return this.cost(this.chc_raw + 1, this.joaj_eff);
@@ -276,6 +281,7 @@
         localStorage.joaj_global = this.joaj_global;
         localStorage.joaj_bought = this.joaj_bought;
         localStorage.joaj_boost = this.joaj_boost;
+        localStorage.joaj_enchants = this.joaj_enchants;
         localStorage.jade = this.jade;
       },
       delete_saved: function() {
