@@ -1,0 +1,90 @@
+<html>
+<head>
+<title>GDP Monitor</title>
+<script src="https://cdn.jsdelivr.net/npm/vue"></script>
+<style>
+.player-table-item {
+  transition: all 1s;
+}
+.player-table-item > * {
+  transition: all 1s;
+  overflow: hidden;
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <div>
+    <input type="checkbox" id="refresh_type" v-model="refresh.auto" v-on:change="toggleAuto" />
+    <label for="refresh_type">Update Data {{ refresh.auto ? "Automatically" : "Manually" }}</label>
+  </div>
+  <div>
+    <template v-if="refresh.auto">
+      Interval: 
+      <input type="number" v-model.number="refresh.interval" />
+      seconds
+    </template>
+    <template v-else>
+      <input type="button" onclick="refreshData()" value="Update Data" />
+    </template>
+  </div>
+  <div>Last Update: {{ last_refresh_string }} <label for="timzone">{{ refresh.local ? "Local" : "Server" }} Time</label><input type="checkbox" id="timezone" v-model="refresh.local" /></div>
+  <table>
+    <thead>
+      <tr v-if="num_players > 0"><th scope="col">Username</th><th scope="col">GDP This Week</th><th>GDP Last Week</th></tr>
+    </thead>
+    <tbody name="player-table" is="transition-group">
+      <tr class="player-table-item" v-for="item in a_list" :key="item.username"><td scope="row">{{ item.username }}</td><td>{{ item.gdp.weekly_dp }}</td><td>{{ item.gdp.last_weekly_dp }}</td></tr>
+    </tbody>
+  </table>
+</div>
+<script type="text/javascript">
+  var vm = new Vue({
+    el: '#app',
+    data() { return {
+      a_list: [],
+      refresh: {
+        auto: false,
+        interval: 300,
+        last: 0,
+        local: true,
+      },
+    }; },
+    computed: {
+      num_players() { return this.a_list.length; },
+      last_refresh_string() { return this.refresh.last ? (this.refresh.local ? (new Date(this.refresh.last)).toLocaleString() : (new Date(this.refresh.last)).toLocaleString('en-GB', {hour12:false,timeZone:'Europe/London'})) : "Never" },
+    },
+  });
+  function refreshData() {
+    let getter = new XMLHttpRequest();
+    getter.onreadystatechange = function () {
+      if(this.readyState == 4) {
+        if(this.status == 200) {
+          let fresh_data = JSON.parse(this.responseText);
+          fresh_data.sort((a,b) => { return a.username.localeCompare(b.username); });
+          fresh_data.sort((a,b) => { return b.gdp.weekly_dp - a.gdp.weekly_dp; });
+          vm.a_list = fresh_data;
+          vm.refresh.last = Date.now();
+        } else {
+          // Deal with errors?
+        }
+        if(vm.refresh.auto) {
+          refresh_timeout = setTimeout(refreshData, vm.refresh.interval*1000);
+        }
+      }
+    }
+    getter.open("GET", "https://lyrania.co.uk/api/guilds.php?type=members&api_code=1914324", true);
+    getter.send();
+  }
+  var refresh_timeout = null;
+  function toggleAuto() {
+    if(vm.refresh.auto) {
+      refreshData();
+    } else if(refresh_timeout) {
+      clearTimeout(refresh_timeout);
+      refresh_timeout = null;
+    }
+  }
+</script>
+</body>
+</html>
