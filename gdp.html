@@ -14,21 +14,34 @@
 </head>
 <body>
 <div id="app">
-  <div>
-    <input type="checkbox" id="refresh_type" v-model="refresh.auto" v-on:change="toggleAuto" />
-    <label for="refresh_type">Update Data {{ refresh.auto ? "Automatically" : "Manually" }}</label>
+  <div style="border:1px solid grey; margin:1px; padding:2px;">
+    Settings and data are saved using the browser's "Local Storage" feature. Clear the checkboxes if you do not desire this information to be retained.
+    <div>
+      <input type="checkbox" id="save_settings" v-model="save.settings" />
+      <label for="save_settings">Retain Settings After Refresh</label>
+    </div>
+    <div>
+      <input type="checkbox" id="save_data" v-model="save.data" />
+      <label for="save_data">Retain Data After Refresh</label>
+    </div>
   </div>
-  <div>
-    <template v-if="refresh.auto">
-      Interval: 
-      <input type="number" v-model.number="refresh.interval" />
-      seconds
-    </template>
-    <template v-else>
-      <input type="button" onclick="refreshData()" value="Update Data" />
-    </template>
+  <div style="border:1px solid grey; margin:1px; padding:2px;">
+    <div>
+      <input type="checkbox" id="refresh_type" v-model="refresh.auto" v-on:change="toggleAuto" />
+      <label for="refresh_type">Update Data {{ refresh.auto ? "Automatically" : "Manually" }}</label>
+    </div>
+    <div>
+      <template v-if="refresh.auto">
+        Interval: 
+        <input type="number" v-model.number="refresh.interval" />
+        seconds
+      </template>
+      <template v-else>
+        <input type="button" onclick="refreshData()" value="Update Data" />
+      </template>
+    </div>
+    <div>Last Update: {{ last_refresh_string }} <label for="timzone">{{ refresh.local ? "Local" : "Server" }} Time</label><input type="checkbox" id="timezone" v-model="refresh.local" /></div>
   </div>
-  <div>Last Update: {{ last_refresh_string }} <label for="timzone">{{ refresh.local ? "Local" : "Server" }} Time</label><input type="checkbox" id="timezone" v-model="refresh.local" /></div>
   <table>
     <thead>
       <tr v-if="num_players > 0"><th scope="col">Username</th><th scope="col">GDP This Week</th><th>GDP Last Week</th></tr>
@@ -49,10 +62,46 @@
         last: 0,
         local: true,
       },
+      save: {
+        settings: false,
+        data: false,
+      },
     }; },
     computed: {
       num_players() { return this.a_list.length; },
       last_refresh_string() { return this.refresh.last ? (this.refresh.local ? (new Date(this.refresh.last)).toLocaleString() : (new Date(this.refresh.last)).toLocaleString('en-GB', {hour12:false,timeZone:'Europe/London'})) : "Never" },
+    },
+    mounted() {
+      if(localStorage.save) { this.save = JSON.parse(localStorage.save); }
+      if(this.save.settings && localStorage.refresh) { this.refresh = JSON.parse(localStorage.refresh); }
+      if(localStorage.raw_data) { this.save.data = true; this.a_list = JSON.parse(localStorage.raw_data); }
+    },
+    watch: {
+      save: {
+        deep: true,
+        handler(new_val) {
+          if(new_val.settings) {
+            localStorage.save = JSON.stringify(new_val);
+            localStorage.refresh = JSON.stringify(this.refresh);
+          } else {
+            localStorage.removeItem("save");
+            localStorage.removeItem("refresh");
+          }
+          if(new_val.data) {
+            localStorage.raw_data = JSON.stringify(this.a_list);
+          } else {
+            localStorage.removeItem("raw_data");
+          }
+        },
+      },
+      refresh: {
+        deep: true,
+        handler(new_val) {
+          if(this.save.settings) {
+            localStorage.refresh = JSON.stringify(new_val);
+          }
+        },
+      },
     },
   });
   function refreshData() {
@@ -62,8 +111,12 @@
         if(this.status == 200) {
           let fresh_data = JSON.parse(this.responseText);
           fresh_data.sort((a,b) => { return a.username.localeCompare(b.username); });
+          fresh_data.sort((a,b) => { return b.gdp.last_weekly_dp - a.gdp.last_weekly_dp; });
           fresh_data.sort((a,b) => { return b.gdp.weekly_dp - a.gdp.weekly_dp; });
           vm.a_list = fresh_data;
+          if(vm.save.data) {
+            localStorage.raw_data = JSON.stringify(fresh_data);
+          }
           vm.refresh.last = Date.now();
         } else {
           // Deal with errors?
